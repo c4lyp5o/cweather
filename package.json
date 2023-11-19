@@ -1,19 +1,27 @@
 {
   "name": "cweather",
   "version": "1.0.0",
-  "description": "",
+  "description": "A weather data aggregator that subscribes to an MQTT broker and saves data to a database.",
   "main": "server.js",
   "scripts": {
+    "start": "node server.js",
     "single-publish-amqp": "nodemon single-publish-amqp.js",
     "cluster-publish-amqp": "nodemon cluster-publish-amqp.js",
     "single-publish-mqtt": "nodemon single-publish-mqtt.js",
     "cluster-publish-mqtt": "nodemon cluster-publish-mqtt.js",
     "start-both-single": "concurrently \"npm run single-publish-amqp\" \"npm run single-publish-mqtt\"",
-    "start-both-cluster": "concurrently \"npm run cluster-publish-amqp\" \"npm run cluster-publish-mqtt\""
+    "start-both-cluster": "concurrently \"npm run cluster-publish-amqp\" \"npm run cluster-publish-mqtt\"",
+    "test": "jest"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "mqtt",
+    "weather",
+    "aggregator",
+    "fastify",
+    "node.js"
+  ],
+  "author": "c4lyp5o",
+  "license": "MIT",
   "dependencies": {
     "@prisma/client": "^5.6.0",
     "amqplib": "^0.10.3",
