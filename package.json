@@ -1,0 +1,28 @@
+{
+  "name": "cweather",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "single-publish-amqp": "nodemon single-publish-amqp.js",
+    "cluster-publish-amqp": "nodemon cluster-publish-amqp.js",
+    "single-publish-mqtt": "nodemon single-publish-mqtt.js",
+    "cluster-publish-mqtt": "nodemon cluster-publish-mqtt.js",
+    "start-both-single": "concurrently \"npm run single-publish-amqp\" \"npm run single-publish-mqtt\"",
+    "start-both-cluster": "concurrently \"npm run cluster-publish-amqp\" \"npm run cluster-publish-mqtt\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^5.6.0",
+    "amqplib": "^0.10.3",
+    "concurrently": "^8.2.2",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.24.3",
+    "mqtt": "^5.2.2",
+    "mqtt-packet": "^9.0.0",
+    "nodemon": "^3.0.1",
+    "prisma": "^5.6.0"
+  }
+}

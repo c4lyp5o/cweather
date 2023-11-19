@@ -1,0 +1,4 @@
+/node_modules
+/prisma/cweather.db
+/prisma/migrations
+.env
