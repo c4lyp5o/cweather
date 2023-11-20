@@ -5,6 +5,23 @@ const winston = require('winston');
 
 const prismaClient = require('./prisma/client');
 
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp({
+      format: 'YYYY-MM-DD HH:mm:ss',
+    }),
+    winston.format.json(),
+    winston.format.printf(
+      (info) => `${info.timestamp} ${info.level}: ${info.message}`
+    )
+  ),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: './logs/logfile.log' }),
+  ],
+});
+
 const clientId = `mqtt_${Math.random().toString(16).slice(3)}`;
 
 const client = mqtt.connect(`mqtt://${process.env.MQTT_SERVER}`, {
@@ -45,9 +62,9 @@ async function saveToTable(tableName, placeId, temperature, humidity) {
         humidity,
       },
     });
-    winston.info(`Saved to ${tableName} table`);
+    logger.info(`Saved to ${tableName} table`);
   } catch (error) {
-    winston.error(`Failed to save to ${tableName} table: ${error.message}`);
+    logger.error(`Failed to save to ${tableName} table: ${error.message}`);
   }
 }
 
@@ -59,7 +76,7 @@ fastify.get('/', async (request, reply) => {
     const distinctPlaceId = await prismaClient.byMinute.findMany({
       distinct: ['placeId'],
     });
-    distinctPlaceId.map(() => x.placeId);
+    distinctPlaceId.map((x) => x.placeId);
     return {
       message:
         'Calypso Weather Station API. Please provide placeId and type as query string.',
@@ -230,7 +247,7 @@ client.on('message', (topic, payload) => {
       byMonth = [];
     }
   } catch (error) {
-    winston.error(`Failed to process message: ${error.message}`);
+    logger.error(`Failed to process message: ${error.message}`);
   }
 });
 
