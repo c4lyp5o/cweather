@@ -252,9 +252,12 @@ client.on('message', (topic, payload) => {
 });
 
 // start the server
-fastify.listen({ port: process.env.PORT || 3000 }, (err, address) => {
-  if (err) {
-    fastify.log.error(err);
-    process.exit(1);
+fastify.listen(
+  { port: process.env.PORT || 3000, host: '0.0.0.0' },
+  (err, address) => {
+    if (err) {
+      fastify.log.error(err);
+      process.exit(1);
+    }
   }
-});
+);
