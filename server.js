@@ -1,6 +1,7 @@
 require('dotenv').config();
 const mqtt = require('mqtt');
 const fastify = require('fastify')({ logger: true });
+const winston = require('winston');
 
 const prismaClient = require('./prisma/client');
 
@@ -23,7 +24,6 @@ let byMinute = [];
 let byHour = [];
 let byDay = [];
 let byMonth = [];
-let byYear = [];
 
 function calculateMedian(values) {
   values.sort((a, b) => a - b);
@@ -36,84 +36,18 @@ function calculateMedian(values) {
   return (values[half - 1] + values[half]) / 2.0;
 }
 
-function calculateAndSave(placeId, values, saveFunction) {
-  const medianTemperature = calculateMedian(values.map((x) => x.temperature));
-  const medianHumidity = calculateMedian(values.map((x) => x.humidity));
-  saveFunction(placeId, medianTemperature, medianHumidity);
-}
-
-async function saveToMinuteTable(placeId, temperature, humidity) {
+async function saveToTable(tableName, placeId, temperature, humidity) {
   try {
-    await prismaClient.byMinute.create({
+    await prismaClient[tableName].create({
       data: {
         placeId,
         temperature,
         humidity,
       },
     });
-    console.log('Saved to minute table');
+    winston.info(`Saved to ${tableName} table`);
   } catch (error) {
-    console.error(error);
-  }
-}
-
-async function saveToHourTable(placeId, temperature, humidity) {
-  try {
-    await prismaClient.byHour.create({
-      data: {
-        placeId,
-        temperature,
-        humidity,
-      },
-    });
-    console.log('Saved to hour table');
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-async function saveToDayTable(placeId, temperature, humidity) {
-  try {
-    await prismaClient.byDay.create({
-      data: {
-        placeId,
-        temperature,
-        humidity,
-      },
-    });
-    console.log('Saved to day table');
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-async function saveToMonthTable(placeId, temperature, humidity) {
-  try {
-    await prismaClient.byMonth.create({
-      data: {
-        placeId,
-        temperature,
-        humidity,
-      },
-    });
-    console.log('Saved to month table');
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-async function saveToYearTable(placeId, temperature, humidity) {
-  try {
-    await prismaClient.byYear.create({
-      data: {
-        placeId,
-        temperature,
-        humidity,
-      },
-    });
-    console.log('Saved to year table');
-  } catch (error) {
-    console.error(error);
+    winston.error(`Failed to save to ${tableName} table: ${error.message}`);
   }
 }
 
@@ -215,62 +149,88 @@ client.on('error', (err) => {
 });
 
 client.on('message', (topic, payload) => {
-  const message = JSON.parse(payload.toString());
+  try {
+    const message = JSON.parse(payload.toString());
 
-  // Validation for MQTT messages
-  if (!message.temperature || !message.humidity || !message.placeId) {
-    console.error('Invalid message:', message);
-    return;
-  }
+    // Validation for MQTT messages
+    if (!message.placeId || !message.temperature || !message.humidity) {
+      throw new Error('Invalid message format');
+    }
 
-  process.stdout.write('.');
+    process.stdout.write('.');
 
-  const { temperature, humidity, placeId } = JSON.parse(payload.toString());
+    temperatureValues.push(message.temperature);
+    humidityValues.push(message.humidity);
+    messageCount++;
 
-  temperatureValues.push(temperature);
-  humidityValues.push(humidity);
-  messageCount++;
+    if (messageCount === 30) {
+      process.stdout.write('\n' + new Date().toLocaleString() + ' ');
+      console.log('30 messages received');
+      saveToTable(
+        'byMinute',
+        message.placeId,
+        calculateMedian(temperatureValues),
+        calculateMedian(humidityValues)
+      );
 
-  if (messageCount === 30) {
-    process.stdout.write('\n' + new Date().toLocaleString() + ' ');
-    console.log('30 messages received');
-    calculateAndSave(placeId, temperatureValues, saveToMinuteTable);
+      messageCount = 0;
+      temperatureValues = [];
+      humidityValues = [];
+    }
 
-    messageCount = 0;
-    temperatureValues = [];
-    humidityValues = [];
-  }
+    if (byMinute.length === 60) {
+      process.stdout.write('\n' + new Date().toLocaleString() + ' ');
+      console.log('60 minutes passed');
+      saveToTable(
+        'byHour',
+        message.placeId,
+        calculateMedian(temperatureValues),
+        calculateMedian(humidityValues)
+      );
 
-  if (byMinute.length === 60) {
-    process.stdout.write('\n' + new Date().toLocaleString() + ' ');
-    console.log('60 minutes passed');
-    calculateAndSave(placeId, byMinute, saveToHourTable);
+      byMinute = [];
+    }
 
-    byMinute = [];
-  }
+    if (byHour.length === 24) {
+      process.stdout.write('\n' + new Date().toLocaleString() + ' ');
+      console.log('24 hours passed');
+      saveToTable(
+        'byDay',
+        message.placeId,
+        calculateMedian(temperatureValues),
+        calculateMedian(humidityValues)
+      );
 
-  if (byHour.length === 24) {
-    process.stdout.write('\n' + new Date().toLocaleString() + ' ');
-    console.log('24 hours passed');
-    calculateAndSave(placeId, byHour, saveToDayTable);
+      byHour = [];
+    }
 
-    byHour = [];
-  }
+    if (byDay.length === 30) {
+      process.stdout.write('\n' + new Date().toLocaleString() + ' ');
+      console.log('30 days passed');
+      saveToTable(
+        'byMonth',
+        message.placeId,
+        calculateMedian(temperatureValues),
+        calculateMedian(humidityValues)
+      );
 
-  if (byDay.length === 30) {
-    process.stdout.write('\n' + new Date().toLocaleString() + ' ');
-    console.log('30 days passed');
-    calculateAndSave(placeId, byDay, saveToMonthTable);
+      byDay = [];
+    }
 
-    byDay = [];
-  }
+    if (byMonth.length === 12) {
+      process.stdout.write('\n' + new Date().toLocaleString() + ' ');
+      console.log('12 months passed');
+      saveToTable(
+        'byYear',
+        message.placeId,
+        calculateMedian(temperatureValues),
+        calculateMedian(humidityValues)
+      );
 
-  if (byMonth.length === 12) {
-    process.stdout.write('\n' + new Date().toLocaleString() + ' ');
-    console.log('12 months passed');
-    calculateAndSave(placeId, byMonth, saveToYearTable);
-
-    byMonth = [];
+      byMonth = [];
+    }
+  } catch (error) {
+    winston.error(`Failed to process message: ${error.message}`);
   }
 });
 
