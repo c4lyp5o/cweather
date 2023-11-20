@@ -10,8 +10,14 @@ COPY package*.json ./
 # Install the application's dependencies inside the Docker image
 RUN npm install
 
+# Generate Prisma client
+RUN npx prisma generate
+
 # Copy the rest of the application to the working directory
 COPY . .
+
+# Run Prisma migrations
+RUN npx prisma migrate deploy
 
 # Expose port 3000 for the application
 EXPOSE 3000
