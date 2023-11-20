@@ -1,26 +1,33 @@
-# Use an official Node.js alpine runtime as the base image
+# pull the Node.js Docker image
 FROM node:alpine
 
-# Set the working directory in the Docker image
+# update the package index
+RUN apk update
+
+# add busybox initscripts to the PATH
+RUN apk add --no-cache tzdata
+
+# set timezone data
+ENV TZ=Asia/Kuala_Lumpur
+
+# create the directory inside the container
 WORKDIR /usr/src/app
 
-# Copy package.json and package-lock.json to the working directory
+# copy the package.json files from local machine to the workdir in container
 COPY package*.json ./
 
-# Install the application's dependencies inside the Docker image
-RUN npm install
+# run npm install in our local machine
+RUN yarn install
 
-# Generate Prisma client
-RUN npx prisma generate
-
-# Copy the rest of the application to the working directory
+# copy the generated modules and all other files to the container
 COPY . .
 
-# Run Prisma migrations
-RUN npx prisma migrate deploy
+# migrate models to database and generate
+RUN yarn prisma generate
+RUN yarn prisma migrate deploy
 
-# Expose port 3000 for the application
+# our app is running on port 3000 within the container, so need to expose it
 EXPOSE 3000
 
-# Define the command to run the application
-CMD [ "node", "server.js" ]
+# the command that starts our app
+CMD yarn start
