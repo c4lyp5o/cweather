@@ -5,7 +5,7 @@ FROM node:alpine
 RUN apk update
 
 # add busybox initscripts to the PATH
-RUN apk add --no-cache tzdata
+RUN apk add --no-cache busybox-initscripts curl openrc tzdata
 
 # set timezone data
 ENV TZ=Asia/Kuala_Lumpur
@@ -24,7 +24,7 @@ COPY . .
 
 # migrate models to database and generate
 RUN yarn prisma generate
-RUN yarn prisma migrate deploy
+RUN yarn prisma migrate dev --name init
 
 # our app is running on port 3000 within the container, so need to expose it
 EXPOSE 3000
