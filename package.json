@@ -4,13 +4,14 @@
   "description": "A weather data aggregator that subscribes to an MQTT broker and saves data to a database.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "dev": "nodemon server.js",
     "single-publish-amqp": "nodemon single-publish-amqp.js",
     "cluster-publish-amqp": "nodemon cluster-publish-amqp.js",
     "single-publish-mqtt": "nodemon single-publish-mqtt.js",
     "cluster-publish-mqtt": "nodemon cluster-publish-mqtt.js",
     "start-both-single": "concurrently \"npm run single-publish-amqp\" \"npm run single-publish-mqtt\"",
     "start-both-cluster": "concurrently \"npm run cluster-publish-amqp\" \"npm run cluster-publish-mqtt\"",
+    "start": "node server.js",
     "test": "jest"
   },
   "keywords": [
