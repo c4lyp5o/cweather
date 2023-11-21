@@ -88,6 +88,9 @@ fastify.get('/', async (request, reply) => {
   const { placeId, type } = request.query;
 
   if (!placeId || !type) {
+    const distinctPlaceId = await prismaClient.byMinute.findMany({
+      distinct: ['placeId'],
+    });
     const pid = distinctPlaceId.map((x) => x.placeId);
     return {
       message:
