@@ -1,6 +1,23 @@
 require('dotenv').config();
+
+const requiredEnvVariables = [
+  'MQTT_SERVER',
+  'MQTT_USERNAME',
+  'MQTT_PASSWORD',
+  'MQTT_TOPIC',
+];
+
+requiredEnvVariables.forEach((variable) => {
+  if (!process.env[variable]) {
+    logger.error(`${variable} is missing`);
+    process.exit(1);
+  }
+});
+
 const mqtt = require('mqtt');
-const fastify = require('fastify')({ logger: true });
+const fastify = require('fastify')({
+  logger: process.env.BUILD_ENV === 'dev' ? true : false,
+});
 const winston = require('winston');
 
 const prismaClient = require('./prisma/client');
@@ -31,20 +48,6 @@ const client = mqtt.connect(`mqtt://${process.env.MQTT_SERVER}`, {
   username: process.env.MQTT_USERNAME,
   password: process.env.MQTT_PASSWORD,
   reconnectPeriod: 1000,
-});
-
-const requiredEnvVariables = [
-  'MQTT_SERVER',
-  'MQTT_USERNAME',
-  'MQTT_PASSWORD',
-  'MQTT_TOPIC',
-];
-
-requiredEnvVariables.forEach((variable) => {
-  if (!process.env[variable]) {
-    logger.error(`${variable} is missing`);
-    process.exit(1);
-  }
 });
 
 let temperatureValues = [];
@@ -177,16 +180,7 @@ fastify.get('/', async (request, reply) => {
       request.headers['x-forwarded-for'] ||
       request.ip ||
       'Not readily available',
-    host: request.headers['host'] || 'Not readily available',
     'user-agent': request.headers['user-agent'] || 'Not readily available',
-    referer: request.headers['referer'] || 'Not readily available',
-    accept: request.headers['accept'] || 'Not readily available',
-    acceptEncoding:
-      request.headers['accept-encoding'] || 'Not readily available',
-    authorization: request.headers['authorization'] || 'Not readily available',
-    cookie: request.headers['cookie'] || 'Not readily available',
-    dnt: request.headers['dnt'] || 'Not readily available',
-    origin: request.headers['origin'] || 'Not readily available',
   };
 });
 
@@ -236,11 +230,14 @@ client.on('message', (topic, payload) => {
     if (byMinute.length === 60) {
       process.stdout.write('\n' + new Date().toLocaleString() + ' ');
       logger.info('60 minutes passed');
+
+      const temperatures = byMinute.map((x) => x.temperature);
+      const humidities = byMinute.map((x) => x.humidity);
       saveToTable(
         'byHour',
         message.placeId,
-        calculateMedian(temperatureValues),
-        calculateMedian(humidityValues)
+        calculateMedian(temperatures),
+        calculateMedian(humidities)
       );
 
       byHour.push(message);
@@ -250,11 +247,14 @@ client.on('message', (topic, payload) => {
     if (byHour.length === 24) {
       process.stdout.write('\n' + new Date().toLocaleString() + ' ');
       logger.info('24 hours passed');
+
+      const temperatures = byMinute.map((x) => x.temperature);
+      const humidities = byMinute.map((x) => x.humidity);
       saveToTable(
         'byDay',
         message.placeId,
-        calculateMedian(temperatureValues),
-        calculateMedian(humidityValues)
+        calculateMedian(temperatures),
+        calculateMedian(humidities)
       );
 
       byDay.push(message);
@@ -264,11 +264,14 @@ client.on('message', (topic, payload) => {
     if (byDay.length === 30) {
       process.stdout.write('\n' + new Date().toLocaleString() + ' ');
       logger.info('30 days passed');
+
+      const temperatures = byMinute.map((x) => x.temperature);
+      const humidities = byMinute.map((x) => x.humidity);
       saveToTable(
         'byMonth',
         message.placeId,
-        calculateMedian(temperatureValues),
-        calculateMedian(humidityValues)
+        calculateMedian(temperatures),
+        calculateMedian(humidities)
       );
 
       byMonth.push(message);
@@ -278,11 +281,14 @@ client.on('message', (topic, payload) => {
     if (byMonth.length === 12) {
       process.stdout.write('\n' + new Date().toLocaleString() + ' ');
       logger.info('12 months passed');
+
+      const temperatures = byMinute.map((x) => x.temperature);
+      const humidities = byMinute.map((x) => x.humidity);
       saveToTable(
         'byYear',
         message.placeId,
-        calculateMedian(temperatureValues),
-        calculateMedian(humidityValues)
+        calculateMedian(temperatures),
+        calculateMedian(humidities)
       );
 
       byMonth = [];
