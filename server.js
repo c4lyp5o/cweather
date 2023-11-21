@@ -33,6 +33,20 @@ const client = mqtt.connect(`mqtt://${process.env.MQTT_SERVER}`, {
   reconnectPeriod: 1000,
 });
 
+const requiredEnvVariables = [
+  'MQTT_SERVER',
+  'MQTT_USERNAME',
+  'MQTT_PASSWORD',
+  'MQTT_TOPIC',
+];
+
+requiredEnvVariables.forEach((variable) => {
+  if (!process.env[variable]) {
+    logger.error(`${variable} is missing`);
+    process.exit(1);
+  }
+});
+
 let temperatureValues = [];
 let humidityValues = [];
 
@@ -60,6 +74,7 @@ async function saveToTable(tableName, placeId, temperature, humidity) {
         placeId,
         temperature,
         humidity,
+        createdAt: new Date(),
       },
     });
     logger.info(`Saved to ${tableName} table`);
@@ -73,15 +88,13 @@ fastify.get('/', async (request, reply) => {
   const { placeId, type } = request.query;
 
   if (!placeId || !type) {
-    const distinctPlaceId = await prismaClient.byMinute.findMany({
-      distinct: ['placeId'],
-    });
-    distinctPlaceId.map((x) => x.placeId);
+    const pid = distinctPlaceId.map((x) => x.placeId);
     return {
       message:
-        'Calypso Weather Station API. Please provide placeId and type as query string.',
+        'Calypso Weather Station API. Please provide placeId and type as query string e.g. ?placeId=dengkil&type=minute',
       version: '1.0.0',
-      availablePlaceId: distinctPlaceId,
+      availablePlaceId: pid,
+      availableType: ['minute', 'hour', 'day', 'month', 'year'],
     };
   }
 
@@ -147,22 +160,43 @@ fastify.get('/', async (request, reply) => {
   }
 
   return {
+    timeNow: new Date().toLocaleString(),
     placeId: placeId,
-    temperature: tempData,
-    humidity: humidData,
+    temperature:
+      tempData === undefined
+        ? 'No data collected for the time being'
+        : tempData,
+    humidity:
+      humidData === undefined
+        ? 'No data collected for the time being'
+        : humidData,
+    userIp:
+      request.headers['x-forwarded-for'] ||
+      request.ip ||
+      'Not readily available',
+    host: request.headers['host'] || 'Not readily available',
+    'user-agent': request.headers['user-agent'] || 'Not readily available',
+    referer: request.headers['referer'] || 'Not readily available',
+    accept: request.headers['accept'] || 'Not readily available',
+    acceptEncoding:
+      request.headers['accept-encoding'] || 'Not readily available',
+    authorization: request.headers['authorization'] || 'Not readily available',
+    cookie: request.headers['cookie'] || 'Not readily available',
+    dnt: request.headers['dnt'] || 'Not readily available',
+    origin: request.headers['origin'] || 'Not readily available',
   };
 });
 
 client.on('connect', () => {
-  console.log('Connected to MQTT broker');
+  logger.info('Connected to MQTT broker');
 
   client.subscribe([process.env.MQTT_TOPIC], () => {
-    console.log(`Subscribe to topic '${process.env.MQTT_TOPIC}'`);
+    logger.info(`Subscribe to topic '${process.env.MQTT_TOPIC}'`);
   });
 });
 
 client.on('error', (err) => {
-  console.error('Error occurred:', err);
+  logger.error('Error occurred:', err);
 });
 
 client.on('message', (topic, payload) => {
@@ -182,7 +216,7 @@ client.on('message', (topic, payload) => {
 
     if (messageCount === 30) {
       process.stdout.write('\n' + new Date().toLocaleString() + ' ');
-      console.log('30 messages received');
+      logger.info('30 messages received');
       saveToTable(
         'byMinute',
         message.placeId,
@@ -190,6 +224,7 @@ client.on('message', (topic, payload) => {
         calculateMedian(humidityValues)
       );
 
+      byMinute.push(message);
       messageCount = 0;
       temperatureValues = [];
       humidityValues = [];
@@ -197,7 +232,7 @@ client.on('message', (topic, payload) => {
 
     if (byMinute.length === 60) {
       process.stdout.write('\n' + new Date().toLocaleString() + ' ');
-      console.log('60 minutes passed');
+      logger.info('60 minutes passed');
       saveToTable(
         'byHour',
         message.placeId,
@@ -205,12 +240,13 @@ client.on('message', (topic, payload) => {
         calculateMedian(humidityValues)
       );
 
+      byHour.push(message);
       byMinute = [];
     }
 
     if (byHour.length === 24) {
       process.stdout.write('\n' + new Date().toLocaleString() + ' ');
-      console.log('24 hours passed');
+      logger.info('24 hours passed');
       saveToTable(
         'byDay',
         message.placeId,
@@ -218,12 +254,13 @@ client.on('message', (topic, payload) => {
         calculateMedian(humidityValues)
       );
 
+      byDay.push(message);
       byHour = [];
     }
 
     if (byDay.length === 30) {
       process.stdout.write('\n' + new Date().toLocaleString() + ' ');
-      console.log('30 days passed');
+      logger.info('30 days passed');
       saveToTable(
         'byMonth',
         message.placeId,
@@ -231,12 +268,13 @@ client.on('message', (topic, payload) => {
         calculateMedian(humidityValues)
       );
 
+      byMonth.push(message);
       byDay = [];
     }
 
     if (byMonth.length === 12) {
       process.stdout.write('\n' + new Date().toLocaleString() + ' ');
-      console.log('12 months passed');
+      logger.info('12 months passed');
       saveToTable(
         'byYear',
         message.placeId,
